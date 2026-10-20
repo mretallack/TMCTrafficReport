@@ -77,6 +77,55 @@ latitude:  54.519516 .. 61.275787
 Use `--member 0` when reproducing the 4,529-row files. Omitting `--member`
 from the index extractor enumerates matching descriptors in every member.
 
+## National all-member export
+
+All 15 populated `CC=12/LTN=10` members have now completed the same coordinate
+extraction and validation path. National results:
+
+```text
+37,707 member-context rows
+29,231 direct road anchors
+8,476 linked topology fallbacks
+0 unresolved rows
+26,478 unique member-local (area,record) pairs
+30,044 unique LCD values
+```
+
+Durable outputs:
+
+```text
+uk-tmc-locations-all-members-2026.03.csv
+SHA-256 b3e0aec769898d0fff8221586d363451bf47ac5050ad7119afc3fc97f383c948
+
+uk-tmc-lcd-candidates-2026.03.csv
+SHA-256 01e3b0611e4f71b0e039407b022da8442ca49dee27852d323a2d2c217becdcad
+
+uk-tmc-members-2026.03.csv
+SHA-256 ebb7295b092dd1ded6439df5aa4cf14aa57779a8cd417e14fd183086e26fd62d
+```
+
+The all-members table retains `(member,map_ordinal,lcd)`. The candidate table
+has one row per LCD and preserves every member alternative in JSON. Of 30,044
+LCDs, 5,171 occur in multiple members; 4,913 of those have representative
+points more than 5 km apart. Therefore member context must not be discarded by
+blind deduplication.
+
+The 2015 Heart/Trafficmaster UK capture was independently decoded and joined:
+
+```text
+60 unique historical LCDs
+44 with current OSM candidates
+16 absent from the current union
+all matched candidate points inside broad UK bounds
+```
+
+Correlation export:
+
+```text
+uk-heart-2015-current-osm-correlation.csv
+SHA-256 81785a54a5cb7950915c6f5f91c8425fc1bf6a9ce395d2c32280a20e6bf8d0eb
+```
+
 ## Exact licensed FBL transform
 
 The former description of FBL decoding as only:

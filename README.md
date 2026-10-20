@@ -9,9 +9,9 @@ MediaNav 4 head unit and contains:
 - exact ARM-runtime and file-format analysis supporting those decoders; and
 - an early PiFmRds-based TMC transmitter prototype for bench testing.
 
-The immediate map-decoding objective has been achieved for UK SET member 0.
-The transmitter is **not yet validated** and must not be treated as a working
-on-air service.
+The current UK map-decoding objective has been completed for all 15 populated
+SET members and packaged as member-aware national exports. The transmitter is
+**not yet validated** and must not be treated as a working on-air service.
 
 ## Current status
 
@@ -19,9 +19,11 @@ on-air service.
 |---|---|
 | Exact MediaNav runtime identified | Complete: Linux `6.0.12.2.1166_r2`, iGO `9.12.184.822257` |
 | Current UK OSM TMC descriptor decoder | Complete |
-| Member-0 LCD index | Complete: 4,529 `CC=12/LTN=10` locations |
-| Member-0 road coordinates | Complete: 4,222 direct road records; representative points for all 4,529 LCDs |
-| Whole UK SET discovery | Complete at index level: 15 populated members, 30,044 unique LCD values |
+| Member-0 LCD/coordinate exports | Complete: retained as a documented Scotland/northern-UK shard |
+| Whole UK member-aware coordinates | Complete: 37,707 rows across 15 populated members, zero unresolved rows |
+| Unique UK LCD candidate view | Complete: 30,044 LCDs with every member candidate preserved |
+| Duplicate resolution | Analysed: 5,171 duplicated LCDs; do not blindly select one member |
+| Historical Heart correlation | Complete: 44/60 LCDs match current candidates; all matched coordinates are within UK bounds |
 | Road names/full link geometry | Not decoded yet |
 | TMC transmitter encoding | Prototype only; not validated against `redsea` or the head unit |
 | Real head-unit acceptance/re-routing | Not tested |
@@ -62,9 +64,21 @@ CC/LTN/LCD
 ```
 
 Member 0 is a Scotland/northern-UK map shard, not the complete national map.
-Across all 15 members containing `CC=12/LTN=10` descriptors there are 37,707
-rows including duplicates and 30,044 unique LCD values. The runtime iterates
-map contexts and accepts the first usable road object.
+It remains committed as a useful small, reproducible subset. The complete
+member-aware export now covers all 15 populated `CC=12/LTN=10` members:
+
+```text
+37,707 member-context rows
+29,231 direct GEODB road anchors
+8,476 linked predecessor/successor fallbacks
+0 unresolved rows
+30,044 unique LCD values
+```
+
+The 37,707-row table is the complete decoded current-map projection at the
+implemented first-road-record level. The 30,044-row candidate summary preserves
+all member alternatives for duplicated LCDs; it does not claim that an
+arbitrary one-row choice reproduces runtime context precedence.
 
 Member-0 export results:
 
@@ -102,6 +116,10 @@ https://www.google.com/maps?q=57.466873,-4.561485
 The committed decoded tables are under [`data/exports/`](data/exports/):
 
 ```text
+data/exports/uk-tmc-locations-all-members-2026.03.csv
+data/exports/uk-tmc-lcd-candidates-2026.03.csv
+data/exports/uk-tmc-members-2026.03.csv
+data/exports/uk-heart-2015-current-osm-correlation.csv
 data/exports/uk-tmc-index-2026.03.csv
 data/exports/uk-tmc-location-anchors-2026.03.csv
 data/exports/netherlands-tmc-index-2025.09.csv
@@ -120,16 +138,152 @@ Completeness is scope-dependent:
 | UK member-0 first GEODB anchors | 4,222 direct; 307 records contain no direct first anchor |
 | UK member-0 usable coordinates | Complete for this scope: 4,222 direct road-record points plus 307 explicitly linked fallbacks |
 | UK member-0 road names/full link shapes | Incomplete: names, second adjacency-selected endpoint and full polyline remain undecoded |
-| Whole current UK OSM index | Discovered but not consolidated: 30,044 unique LCDs across 15 populated members |
-| Whole current UK OSM coordinates | Not yet exported as one national table; the coordinate extractor currently requires a member selection |
+| Whole current UK OSM member-aware coordinates | Complete: 37,707/37,707 rows across all 15 populated members; 29,231 direct and 8,476 linked; zero unresolved |
+| Whole current UK OSM unique-LCD candidates | Complete: 30,044 rows preserving every member candidate as JSON |
+| Duplicate LCD analysis | Complete: 5,171 duplicated LCDs; 4,913 have candidate points more than 5 km apart |
+| UK member summaries | Complete: 15 rows with counts, coverage and geographic bounds |
+| Historical Heart/current OSM correlation | Complete: 60 Heart LCDs, 44 current matches, 16 absent; all matched candidates inside UK bounds |
 | Historical Trafficmaster LTN 7 table | Not acquired; the Heart log contains messages, not the complete LCL |
 | Historical installed HERE table | Not acquired as a decoded table; only cached event examples are retained |
 | Netherlands member-0 index | Complete for that descriptor: 3,132 LCDs; coordinates are not exported |
 
-Thus, `uk-tmc-location-anchors-2026.03.csv` is the complete usable table for
-**one current OSM shard**, not a complete nationwide UK road-name table. A
-national export requires running the coordinate extractor for each populated
-SET member and then retaining member identity when merging duplicate LCDs.
+Thus, `uk-tmc-locations-all-members-2026.03.csv` is the complete current
+member-aware UK table at the implemented coordinate level. The older
+`uk-tmc-location-anchors-2026.03.csv` is retained as the member-0 subset. Road
+names and full link shapes remain incomplete for every member.
+
+## How the whole-UK tables were built
+
+All 15 populated `CC=12/LTN=10` members have now been extracted and validated.
+The members are:
+
+```text
+0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15, 16, 17
+```
+
+Members 7, 8 and 9 do not contain a matching descriptor. Every populated
+member completed exact coordinate extraction and the validation gates below.
+
+### 1. Export each member independently
+
+Each member has its own GEODB bounds, area-offset tables, road data and type-13
+codebook, so it must be decoded in its own context:
+
+```bash
+members=(0 1 2 3 4 5 6 10 11 12 13 14 15 16 17)
+mkdir -p TrafficReport/tmp/uk-members
+
+for member in "${members[@]}"; do
+  python3 TrafficReport/tools/extract_fbl_tmc_index.py \
+    HeadUnitUpdate-2026-10-19/NaviSync/content/map/UnitedKingdom_osm.fbl \
+    --member "$member" --cc 12 --ltn 10 \
+    --csv "TrafficReport/tmp/uk-members/index-member-${member}.csv"
+
+  python3 TrafficReport/tools/extract_fbl_tmc_anchors.py \
+    HeadUnitUpdate-2026-10-19/NaviSync/content/map/UnitedKingdom_osm.fbl \
+    --key MediaNavToolkit/analysis/xor_table_normal.bin \
+    --member "$member" --cc 12 --ltn 10 \
+    --csv "TrafficReport/tmp/uk-members/locations-member-${member}.csv"
+done
+```
+
+`tools/build_uk_national_exports.py` adds the invocation's member identity to
+every location row while merging, so national rows retain their map context.
+
+### 2. Validate each member before merging
+
+For every member, require:
+
+- location-row count equals that member's descriptor count;
+- every decoded record prefix stays within its indexed record length;
+- each direct `(area,record)` index is valid for that member;
+- every direct point lies within that member's overall geographic bounds;
+- predecessor/successor reciprocity and coordinate coverage are reported;
+- direct, linked-fallback and unresolved counts are recorded separately;
+- the source map hash and extraction-tool revision are identical for all runs.
+
+A failed member must remain separate; it must not be hidden by concatenating
+its partial output with successful members.
+
+### 3. Create a member-aware master table
+
+The resulting table contains exactly 37,707 rows, matching the sum of all 15
+descriptor counts. Its primary audit key is:
+
+```text
+(member, map_ordinal, lcd)
+```
+
+All 37,707 rows have representative coordinates. Of these, 29,231 are direct
+road anchors and 8,476 are explicitly linked fallbacks; none is unresolved.
+The published output is:
+
+```text
+data/exports/uk-tmc-locations-all-members-2026.03.csv
+```
+
+### 4. Analyse duplicate LCDs
+
+Grouping by LCD reduces the measured index from 37,707 member rows to 30,044
+unique numbers. Do not simply keep the first CSV row. For each duplicated LCD,
+compare:
+
+- member and map ordinal;
+- direct versus linked location source;
+- GEODB area/record and road point;
+- predecessor/successor LCDs;
+- coordinate separation and chain bearings.
+
+Duplicates may be identical copies, shard-boundary records, or context-specific
+alternatives. The candidate export preserves every option in `candidate_json`.
+Measured duplicate distribution:
+
+```text
+24,873 LCDs in one member
+3,755 LCDs in two members
+874 LCDs in three members
+322 LCDs in four members
+63 LCDs in five members
+157 LCDs in seven members
+```
+
+There are 5,171 duplicated LCDs. For 4,913 of them, candidate representative
+points differ by more than 5 km; the maximum observed separation is about
+516.34 km. This confirms that blind first-row deduplication would be unsafe.
+
+### 5. Reproduce runtime context precedence
+
+An incoming RDS-TMC message carries `CC`, `LTN` and `LCD`; it does not carry a
+SET member number. `FUN_00b21e7c` iterates active map contexts and accepts the
+first context producing a usable road object. A resolved one-row-per-LCD table
+must therefore either:
+
+1. reproduce that active context order and first-usable rule; or
+2. retain all candidate members and let the consumer select by geography.
+
+The second option is safer until runtime member precedence is independently
+verified.
+
+### 6. Publish distinct audit and candidate outputs
+
+The completed packaging contains:
+
+```text
+uk-tmc-locations-all-members-2026.03.csv
+    all 37,707 validated member rows
+
+uk-tmc-lcd-candidates-2026.03.csv
+    30,044 LCD rows, preserving all member candidates as JSON
+
+uk-tmc-members-2026.03.csv
+    per-member validation and geographic summary
+```
+
+The all-members file is the authoritative audit source. The candidate file is
+the convenient one-row-per-LCD view, but its `convenience_*` columns use a
+documented deterministic heuristic—not proven runtime context precedence.
+Consumers requiring correctness must inspect `candidate_json` or select by
+geography.
 
 ## Do not mix the three UK datasets
 
@@ -179,7 +333,47 @@ committed.
 
 ## Using the exports
 
-### LCD index
+### Complete member-aware UK coordinates
+
+```text
+data/exports/uk-tmc-locations-all-members-2026.03.csv
+```
+
+This is the authoritative complete current UK coordinate projection: 37,707
+rows with `member` retained. Use it for auditing, geographic nearest-candidate
+selection, and any workflow where duplicate LCD context matters.
+
+### Unique-LCD candidate view
+
+```text
+data/exports/uk-tmc-lcd-candidates-2026.03.csv
+```
+
+This has one row for each of the 30,044 unique LCD values. It preserves every
+member option in `candidate_json`, reports candidate separation, and flags
+ambiguity over 5 km. The `convenience_*` fields are deterministic shortcuts,
+not proven runtime choices.
+
+### Member summary
+
+```text
+data/exports/uk-tmc-members-2026.03.csv
+```
+
+This records row/direct/fallback counts and coordinate bounds for all 15
+members.
+
+### Historical Heart correlation
+
+```text
+data/exports/uk-heart-2015-current-osm-correlation.csv
+```
+
+This joins the 60 LCDs observed in the 2015 UK Heart capture to current OSM
+candidates. Forty-four match, sixteen are absent, and every matched candidate
+point is inside broad UK bounds.
+
+### Member-0 LCD index
 
 ```text
 data/exports/uk-tmc-index-2026.03.csv
@@ -189,7 +383,7 @@ Use this when only descriptor membership and ordinal lookup are required. It
 contains one row per member-0 LCD, including `member`, `cc`, `ltn`,
 `descriptor_index`, `map_ordinal` and `lcd`.
 
-### Road-coordinate export
+### Member-0 road-coordinate subset
 
 ```text
 data/exports/uk-tmc-location-anchors-2026.03.csv
@@ -225,6 +419,11 @@ python3 TrafficReport/tools/extract_fbl_tmc_anchors.py \
   --key MediaNavToolkit/analysis/xor_table_normal.bin \
   --member 0 --cc 12 --ltn 10 \
   --csv TrafficReport/data/exports/uk-tmc-location-anchors-2026.03.csv
+
+python3 TrafficReport/tools/build_uk_national_exports.py \
+  --members-dir TrafficReport/tmp/uk-all-members \
+  --output-dir TrafficReport/data/exports \
+  --rds-uk-dir rds-spy-logs/UK
 ```
 
 The tools implement the exact licensed IGOMAP 4 KiB block transform recovered
@@ -249,9 +448,10 @@ For the UK Heart capture:
 provider " Tm TMC ", LTN 7, SID 7, unencrypted
 ```
 
-A future utility can decode the complete log corpus and join compatible
-messages to every current SET member. The current committed road-coordinate
-CSV intentionally covers member 0 only.
+The committed correlation export confirms that 44 of the 60 historical Heart
+LCDs have current OSM candidates and every matched point lies inside broad UK
+bounds. Sixteen historical LCDs are absent. This validates substantial numeric
+continuity while preserving the LTN 7 versus LTN 10 distinction.
 
 ## Transmitter prototype: current limitations
 
