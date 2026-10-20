@@ -324,9 +324,19 @@ The next refinement is road-record adjacency and name-resource decoding. This
 can add a second endpoint, link bearing, and road label without changing the
 proven LCD, anchor, area, or first-point mapping.
 
-## HERE-to-OSM mismatch
+## HERE-to-OSM continuity
 
-The old cached UK event locations came from the installed HERE 2019.Q4 map and
-are not expected to occur in this downloaded OSM table. Historical codes such
-as `17602` and `10024` remain optional HERE-era validation anchors, not current
-OSM anchors.
+The old cached UK events came from the installed HERE 2019.Q4 map and were
+initially compared only with SET member 0. They are absent from that 4,529-row
+member-0 descriptor, but the later whole-SET extraction finds both codes in
+current OSM member 12:
+
+```text
+LCD 10024 -> 51.442833, -0.927315
+LCD 17602 -> 51.077484, -1.309616
+```
+
+This supports deliberate continuity in UK numeric location assignments across
+the HERE-to-OSM migration. The old cache alone does not prove that every
+retained LCD has identical segment, direction, or provider semantics, and the
+two codes remain unsuitable as member-0 validation anchors.
