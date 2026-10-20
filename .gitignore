@@ -1,0 +1,50 @@
+# Local analysis workspace and generated intermediates
+/tmp/
+/venv/
+/dump/tmc_provider_list.txt
+
+# Python caches and test/tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Large/proprietary map, firmware, and decompiler inputs
+*.fbl
+*.fbl.stm
+*.lgu
+*.gpr
+*.rep/
+*.gbf
+*.bin
+*.dll
+*.exe
+*.7z
+*.zip
+*.tar
+*.tar.gz
+
+# Captures, logs, and local build output
+*.log
+*.wav
+*.s16
+*.iq
+/build/
+/dist/
+/out/
+*.o
+*.so
+
+# Local configuration and credentials
+.env
+.env.*
+local_config.*
+*id_rsa*
+*.pem
+
+# Editor/OS metadata
+.DS_Store
+Thumbs.db
+*.swp
+*~
