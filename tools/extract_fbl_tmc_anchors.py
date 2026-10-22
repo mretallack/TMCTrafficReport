@@ -28,9 +28,15 @@ class BlockDirectory:
 
 
 @dataclass
+class RoadDescriptor:
+    arc_count: int
+    has_extra: bool
+
+
+@dataclass
 class RoadCodebook:
     nodes: list[int]
-    descriptor_has_extra: list[bool]
+    descriptors: list[RoadDescriptor]
 
 
 def compact_tree(reader: BitReader) -> list[int]:
@@ -157,15 +163,15 @@ def decode_road_codebook(data: bytes, member_start: int) -> RoadCodebook:
         reader.extended(4, 4)
 
     nodes = compact_tree(reader)
-    descriptor_has_extra: list[bool] = []
+    descriptors: list[RoadDescriptor] = []
     for _ in nodes:
         read_signed_extended(reader, 2, 2)
-        reader.extended(2, 2)
+        arc_count = reader.extended(2, 2)
         reader.extended(2, 2)
         flags = [reader.read(1) for _ in range(9)]
-        descriptor_has_extra.append(bool(flags[2]))
+        descriptors.append(RoadDescriptor(arc_count, bool(flags[2])))
         read_signed_extended(reader, 3, 2)
-    return RoadCodebook(nodes, descriptor_has_extra)
+    return RoadCodebook(nodes, descriptors)
 
 
 def decode_codebook_index(reader: BitReader, codebook: RoadCodebook) -> int:
@@ -231,17 +237,20 @@ def decode_road_area_records(
                 boundary_index += 1
         y -= reader.extended(y_delta_width, y_delta_step) * 0x40
         descriptor_index = decode_codebook_index(reader, codebook)
-        if descriptor_index >= len(codebook.descriptor_has_extra):
+        if descriptor_index >= len(codebook.descriptors):
             raise ValueError(f"invalid road descriptor {descriptor_index}")
-        if codebook.descriptor_has_extra[descriptor_index]:
-            reader.read(16)
-            reader.extended(8, 2)
+        extra_fixed = extra_extended = None
+        if codebook.descriptors[descriptor_index].has_extra:
+            extra_fixed = reader.read(16)
+            extra_extended = reader.extended(8, 2)
         records.append(
             {
                 "road_record_index": record_index,
                 "road_record_lon": x / scale,
                 "road_record_lat": y / scale,
                 "road_descriptor_index": descriptor_index,
+                "road_attribute_fixed16": extra_fixed,
+                "road_attribute_extended": extra_extended,
                 "record_inside_area_bbox": west <= x <= east and south <= y <= north,
             }
         )
@@ -535,6 +544,8 @@ def main() -> None:
                 "road_record_lon": None,
                 "road_record_lat": None,
                 "road_descriptor_index": None,
+                "road_attribute_fixed16": None,
+                "road_attribute_extended": None,
                 "record_inside_area_bbox": None,
             }
         )
