@@ -133,7 +133,16 @@ not proof that every old and new table attribute is identical.
 
 ### Fields not yet decoded
 
-These exports do not yet contain:
+The current extractor can retain the verified serialized diagnostic pair
+`road_attribute_fixed16` / `road_attribute_extended`, which combines at runtime
+as `((fixed16 + 1) << 16) | extended`. The committed CSVs intentionally retain
+their existing schemas and hashes; the pair has not been promoted into the
+national exports because its FPA string/resource target is not yet decoded.
+
+Instruction-level ARM/Unicorn validation currently completes directed
+half-edge parsing for 326 of 1,357 directly referenced member-0 areas. This is
+not sufficient for a national geometry field, so the authoritative exports
+still do not contain:
 
 - road names;
 - the adjacency-selected second road endpoint;

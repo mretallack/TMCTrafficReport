@@ -24,7 +24,7 @@ SET members and packaged as member-aware national exports. The transmitter is
 | Unique UK LCD candidate view | Complete: 30,044 LCDs with every member candidate preserved |
 | Duplicate resolution | Analysed: 5,171 duplicated LCDs; do not blindly select one member |
 | Historical Heart correlation | Complete: 44/60 LCDs match current candidates; all matched coordinates are within UK bounds |
-| Road names/full link geometry | Not decoded yet |
+| Road names/full link geometry | Partial research only: layout/traversal recovered; 326/1,357 referenced member-0 areas pass strict half-edge topology, but detailed areas and FPA string resolution remain unvalidated |
 | TMC transmitter encoding | Prototype only; not validated against `redsea` or the head unit |
 | Real head-unit acceptance/re-routing | Not tested |
 | Live traffic-feed integration | Not implemented |

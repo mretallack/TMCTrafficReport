@@ -354,6 +354,117 @@ python3 TrafficReport/tools/extract_fbl_tmc_anchors.py \
   --csv TrafficReport/data/exports/uk-tmc-location-anchors-2026.03.csv
 ```
 
+## Geometry and road-name follow-up state (2026-10-22)
+
+The runtime path beyond the first point has now been recovered far enough to
+construct and validate directed half-edges for a subset of member 0, but not far
+enough to publish national second endpoints or names.
+
+### Directed half-edge layout and traversal
+
+Exact `FUN_0030ae88`/`FUN_0032943c` structure:
+
+```text
+road node array                 area object +0x84
+road node size                  0x18 bytes
+node +0x02                      outgoing half-edge base index
+node +0x04/+0x08                first coordinate
+node +0x0c                      optional raw road/address reference
+node +0x10                      type-13 descriptor pointer
+descriptor +0x06                outgoing half-edge count
+half-edge array                 area object +0xb4
+half-edge size                  8 bytes
+```
+
+The road parser creates both directed halves of an intra-area edge when it
+reads the first half. When it later reaches the already-populated reciprocal
+slot, it consumes no additional stream bits. `FUN_0032943c` selects the first
+edge with the descriptor selector, then chooses the non-backtracking edge at a
+degree-two interior node. The second half-edge word stores the target raw
+`(area,record)` reference in bits 1..31 and an orientation bit in bit 0.
+
+The external selector branch consumes an additional nine-bit record ID. The
+member-0 type-13 selector has 124 static descriptors and its dynamic descriptor
+sentinel is `-1`, so inline replacement descriptors are inactive.
+
+A strict local probe currently completes:
+
+```text
+326 / 1,357 directly referenced member-0 road areas
+```
+
+Every completed area has valid internal reciprocal links. Representative
+checks include 8/8 internal reciprocals in area 193, 24/24 in area 234, 60/60
+in area 261, 108/108 in area 392, and 28/28 in area 706. The remaining 1,031
+areas are not exported as geometry.
+
+### Unicorn instruction-level validation
+
+An ignored local Unicorn 2.1.4 harness maps the exact ARM ELF and executes the
+real `FUN_0030ae88` instructions with reconstructed area objects. It establishes
+that the Python half-edge translation is not the source of the detailed-area
+failure:
+
+```text
+area 193: nodes 7, arcs 14, bit 727 -> 895,
+          all 14 half-edges populated, PC reaches 0x0030b900
+
+area 883: nodes 95, arcs 258, bit 5656 -> 5730,
+          ARM reaches selector 106 where only 0..101 is valid
+```
+
+A second harness executes the preceding ARM node/descriptor loop. It produces
+zero coordinate or descriptor-index mismatches against Python for areas 193
+and 883. For area 883 it reaches node-loop bit 3448; the following verified
+91-entry optional block advances to arc bit 5656. Thus the unresolved value is
+an input/state distinction not exposed by re-transcribing the audited arc
+loop. No geometry is accepted merely because it was produced by a permissive
+probe.
+
+The exact ARM application was also made executable under local QEMU with an
+ARMHF sysroot, exact firmware data/device profiles, current content and
+licenses, private DBus, and a headless Weston IVI compositor. Its engine takes
+`FUN_006f97b8` (generic engine error, not the license-error path) before opening
+an FBL, so a live area-883 object could not be captured. A real initialized
+head-unit process/core or the missing head-unit services remains the decisive
+way to compare live pre-loop state.
+
+### Raw road/address reference and FPA
+
+When descriptor byte 0 bit 1 is set, the road parser stores:
+
+```text
+raw_reference = ((fixed16 + 1) << 16) | extended(8,2)
+```
+
+The extractor now retains its two serialized components as
+`road_attribute_fixed16` and `road_attribute_extended`. In member 0, 2,124 of
+4,222 direct records carry the pair, with 1,102 unique fixed values and 1,802
+unique pairs. These are raw diagnostics, not decoded road names.
+
+The corresponding `UnitedKingdom_osm.fpa` is confirmed as a licensed address
+and geocoding SET resource:
+
+```text
+source size                         172,926,976 bytes
+source MD5                          098ee57bbfed842609447f83822b804c
+SET members                         18
+decrypted local SHA-256             5a8cef385307bdd1d527aa7af1f90c2a8a9792788a124e53bbe4f29e9e7f8a77
+member-0 top-level offset entries   6,204
+member-0 packed variable records    6,203
+member-0 indexed blob               approximately 20.85 MB
+```
+
+The FPA records are packed and do not expose inline readable road strings.
+The raw reference has not yet been mapped through the FPA record/string codec,
+so fields must not be labelled `road_name`, `road_ref`, or `alt_name` yet.
+
+The committed member-0 and national CSV files predate the two raw diagnostic
+columns and retain their documented schemas and hashes. Regenerating the
+member-0 CSV with the current tool adds only those columns: all 4,529 existing
+row/field values remain identical, with 4,222 direct anchors and 2,124 rows
+carrying the raw attribute pair.
+
 ## Remaining limitations
 
 The current export now contains the individual road-record point, but not yet
@@ -369,8 +480,10 @@ the complete named road-link geometry:
 - inherited locations with large `representative_hops` are suitable for coarse
   lookup only.
 
-The next refinement is road-record adjacency and name-resource decoding. This
-can add a second endpoint, link bearing, and road label without changing the
+Further refinement requires either a live initialized head-unit road object for
+comparison or recovery of the pre-loop state/resource distinction that makes
+detailed areas decode differently. Only after that validation can a second
+endpoint, link bearing, polyline, or road label be added without changing the
 proven LCD, anchor, area, or first-point mapping.
 
 ## HERE-to-OSM continuity
